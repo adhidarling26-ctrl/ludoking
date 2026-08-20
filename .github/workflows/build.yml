@@ -18,11 +18,18 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Compile and Sign APK
+      - name: Clean Res & Compile APK
         run: |
-          # Automatically detect installed Android SDK tools and platform
-          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
-          PLATFORM_DIR=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -n 1)
+          # Remove any accidental non-xml files from res
+          find res/ -type f ! -name "*.xml" -delete 2>/dev/null || true
+
+          # Select stable build tools and android.jar
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/34.* $ANDROID_HOME/build-tools/33.* 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$BUILD_TOOLS" ]; then BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1); fi
+
+          PLATFORM_DIR=$(ls -d $ANDROID_HOME/platforms/android-34 $ANDROID_HOME/platforms/android-33 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$PLATFORM_DIR" ]; then PLATFORM_DIR=$(ls -d $ANDROID_HOME/platforms/android-[0-9]* | sort -V | tail -n 1); fi
+
           ANDROID_JAR="$PLATFORM_DIR/android.jar"
 
           echo "Using Build Tools: $BUILD_TOOLS"

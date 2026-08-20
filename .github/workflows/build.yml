@@ -1,0 +1,35 @@
+name: Build Ludo APK
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Compile and Sign APK
+        run: |
+          export PATH=$ANDROID_HOME/build-tools/33.0.2:$PATH
+          mkdir -p build obj
+          aapt2 compile --dir res -o build/res.zip
+          aapt2 link -o build/unaligned.apk -I $ANDROID_HOME/platforms/android-33/android.jar --manifest AndroidManifest.xml build/res.zip --java src
+          javac -cp $ANDROID_HOME/platforms/android-33/android.jar -d obj src/com/example/prankludo/*.java
+          d8 --output build --lib $ANDROID_HOME/platforms/android-33/android.jar obj/com/example/prankludo/*.class
+          jar uf build/unaligned.apk -C build classes.dex
+          zipalign -v -p 4 build/unaligned.apk build/aligned.apk
+          keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=AndroidDebug,O=Android,C=US"
+          apksigner sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out LudoKing.apk build/aligned.apk
+
+      - name: Upload Generated APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LudoKing-APK
+          path: LudoKing.apk

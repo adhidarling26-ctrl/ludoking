@@ -33,7 +33,7 @@ public class MainActivity extends Activity {
     private boolean isRolling = false, canMove = false;
     private final Random rand = new Random();
 
-    // 52 Track steps (0..51)
+    // 52 Track cells: {row, col}
     private static final int[][] TRACK = {
         {6,1},{6,2},{6,3},{6,4},{6,5}, {5,6},{4,6},{3,6},{2,6},{1,6},{0,6},
         {0,7}, {0,8},{1,8},{2,8},{3,8},{4,8},{5,8}, {6,9},{6,10},{6,11},{6,12},{6,13},{6,14},
@@ -79,7 +79,12 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             p.setMargins(0, 30, 0, 0);
             btn.setLayoutParams(p);
-            btn.setOnClickListener(v -> startGame(c));
+            btn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startGame(c);
+                }
+            });
             layout.addView(btn);
         }
         setContentView(layout);
@@ -116,7 +121,12 @@ public class MainActivity extends Activity {
         bottom.setBackgroundColor(Color.parseColor("#051E48"));
 
         diceView = new DiceView(this);
-        diceView.setOnClickListener(v -> rollDice());
+        diceView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                rollDice();
+            }
+        });
         bottom.addView(diceView, new LinearLayout.LayoutParams(140, 140));
 
         tokenRow = new LinearLayout(this);
@@ -174,11 +184,12 @@ public class MainActivity extends Activity {
     private void rollDice() {
         if (isRolling || canMove) return;
         isRolling = true;
-        Handler h = new Handler();
-        int finalRoll = calculateRoll(players.get(curTurn));
+        final Handler h = new Handler();
+        final int finalRoll = calculateRoll(players.get(curTurn));
 
         h.post(new Runnable() {
             int ticks = 0;
+            @Override
             public void run() {
                 if (ticks < 6) {
                     diceVal = rand.nextInt(6) + 1;
@@ -200,7 +211,7 @@ public class MainActivity extends Activity {
         tokenRow.removeAllViews();
         Player p = players.get(curTurn);
         boolean hasMove = false;
-        for (Token t : p.tokens) {
+        for (final Token t : p.tokens) {
             boolean valid = (t.step == -1 && diceVal == 6) || (t.step >= 0 && t.step + diceVal <= 56);
             if (valid) hasMove = true;
             Button b = new Button(this);
@@ -208,11 +219,21 @@ public class MainActivity extends Activity {
             b.setEnabled(valid);
             b.setBackgroundColor(valid ? p.color : Color.DKGRAY);
             b.setTextColor(Color.WHITE);
-            b.setOnClickListener(v -> move(t));
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    move(t);
+                }
+            });
             tokenRow.addView(b);
         }
         if (!hasMove) {
-            new Handler().postDelayed(this::nextTurn, 700);
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    nextTurn();
+                }
+            }, 700);
         }
     }
 
@@ -313,8 +334,8 @@ public class MainActivity extends Activity {
                         // In Base
                         int baseCol = (player.startTrackIndex == 0 ? 10 : (player.startTrackIndex == 13 ? 1 : (player.startTrackIndex == 26 ? 1 : 10)));
                         int baseRow = (player.startTrackIndex == 0 ? 10 : (player.startTrackIndex == 13 ? 1 : (player.startTrackIndex == 26 ? 10 : 1)));
-                        tx = ox + (baseCol + (t.id % 2) * 3 + 1) * cell;
-                        ty = oy + (baseRow + (t.id / 2) * 3 + 1) * cell;
+                        tx = ox + (baseCol + (t.id % 2) * 3 + 1.5f) * cell;
+                        ty = oy + (baseRow + (t.id / 2) * 3 + 1.5f) * cell;
                     } else if (t.step < 52) {
                         int pos = (player.startTrackIndex + t.step) % 52;
                         tx = ox + (TRACK[pos] + 0.5f) * cell;
@@ -379,7 +400,7 @@ public class MainActivity extends Activity {
             p.setColor(color);
             float mid = sz / 2f + 5, l = sz * 0.28f + 5, r = sz * 0.72f + 5;
             float rad = sz * 0.08f;
-            if (val % 2 == 1) canvas.drawCircle(mid, mid, rad, p); // 1, 3, 5
+            if (val % 2 == 1) canvas.drawCircle(mid, mid, rad, p);
             if (val >= 2) { canvas.drawCircle(l, l, rad, p); canvas.drawCircle(r, r, rad, p); }
             if (val >= 4) { canvas.drawCircle(r, l, rad, p); canvas.drawCircle(l, r, rad, p); }
             if (val == 6) { canvas.drawCircle(l, mid, rad, p); canvas.drawCircle(r, mid, rad, p); }

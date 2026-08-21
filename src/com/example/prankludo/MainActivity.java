@@ -336,7 +336,7 @@ public class MainActivity extends Activity {
                     } else if (t.step < 52) {
                         int pos = (player.startTrackIndex + t.step) % 52;
                         int trackRow = TRACK[pos][0];
-                        int trackCol = TRACK[pos];
+                       int trackCol = TRACK[pos];
                         tx = ox + (trackCol + 0.5f) * cell;
                         ty = oy + (trackRow + 0.5f) * cell;
                     } else {

@@ -2,407 +2,387 @@ package com.example.prankludo;
 
 import android.app.Activity;
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.RectF;
+import android.graphics.*;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import android.widget.*;
+import java.util.*;
 
 public class MainActivity extends Activity {
-
-    // Game state models
     public static class Token {
-        public int id;
-        public int position; // -1: Base, 0..51: Track, 999: Home
-        public boolean wasJustKilled = false;
-
-        public Token(int id) {
-            this.id = id;
-            this.position = -1;
-        }
+        public int id, step = -1; // -1: Base, 0..56: Path, 999: Home
+        public boolean wasKilled = false;
+        public Token(int id) { this.id = id; }
     }
 
     public static class Player {
         public String name;
-        public int color;
-        public boolean isRigged;
-        public int startIndex;
-        public Token[] tokens;
-
-        public Player(String name, int color, boolean isRigged, int startIndex) {
-            this.name = name;
-            this.color = color;
-            this.isRigged = isRigged;
-            this.startIndex = startIndex;
-            this.tokens = new Token[]{new Token(0), new Token(1), new Token(2), new Token(3)};
+        public int color, darkColor, startTrackIndex;
+        public boolean isBlue;
+        public Token[] tokens = {new Token(0), new Token(1), new Token(2), new Token(3)};
+        public Player(String name, int color, int darkColor, boolean isBlue, int startIdx) {
+            this.name = name; this.color = color; this.darkColor = darkColor;
+            this.isBlue = isBlue; this.startTrackIndex = startIdx;
         }
     }
 
-    private int playerCount = 4;
     private List<Player> players = new ArrayList<>();
-    private int currentPlayerIndex = 0;
-    private int diceValue = 1;
-    private boolean isRolling = false;
-    private boolean canMove = false;
-    private final int trackLength = 52;
-    private final Random random = new Random();
+    private int curTurn = 0, diceVal = 6;
+    private boolean isRolling = false, canMove = false;
+    private final Random rand = new Random();
 
-    private LinearLayout rootLayout;
+    // 52 Track steps (0..51)
+    private static final int[][] TRACK = {
+        {6,1},{6,2},{6,3},{6,4},{6,5}, {5,6},{4,6},{3,6},{2,6},{1,6},{0,6},
+        {0,7}, {0,8},{1,8},{2,8},{3,8},{4,8},{5,8}, {6,9},{6,10},{6,11},{6,12},{6,13},{6,14},
+        {7,14}, {8,14},{8,13},{8,12},{8,11},{8,10},{8,9}, {9,8},{10,8},{11,8},{12,8},{13,8},{14,8},
+        {14,7}, {14,6},{13,6},{12,6},{11,6},{10,6},{9,6}, {8,5},{8,4},{8,3},{8,2},{8,1},{8,0}, {7,0}, {6,0}
+    };
+
     private LudoBoardView boardView;
-    private TextView turnTextView;
-    private Button diceButton;
-    private LinearLayout tokenControlLayout;
+    private TextView turnText;
+    private DiceView diceView;
+    private LinearLayout tokenRow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        showPlayerSelectionScreen();
+        showHomeScreen();
     }
 
-    // ----------------------------------------------------
-    // SCREEN 1: PLAYER SETUP (2, 4, 6, 8 Players)
-    // ----------------------------------------------------
-    private void showPlayerSelectionScreen() {
-        LinearLayout menuLayout = new LinearLayout(this);
-        menuLayout.setOrientation(LinearLayout.VERTICAL);
-        menuLayout.setGravity(Gravity.CENTER);
-        menuLayout.setPadding(40, 40, 40, 40);
-        menuLayout.setBackgroundColor(Color.parseColor("#121212"));
+    private void showHomeScreen() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(Gravity.CENTER);
+        layout.setBackgroundColor(Color.parseColor("#0C429A"));
+        layout.setPadding(30, 50, 30, 50);
 
-        TextView titleView = new TextView(this);
-        titleView.setText("Ludo Classic");
-        titleView.setTextSize(28);
-        titleView.setTextColor(Color.WHITE);
-        titleView.setGravity(Gravity.CENTER);
-        menuLayout.addView(titleView);
+        TextView title = new TextView(this);
+        title.setText("👑 LUDO KING");
+        title.setTextSize(32);
+        title.setTextColor(Color.parseColor("#FFD700"));
+        title.setTypeface(null, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        layout.addView(title);
 
-        TextView subTitleView = new TextView(this);
-        subTitleView.setText("Select Number of Players\n(Blue player is active)");
-        subTitleView.setTextSize(14);
-        subTitleView.setTextColor(Color.LTGRAY);
-        subTitleView.setGravity(Gravity.CENTER);
-        subTitleView.setPadding(0, 20, 0, 40);
-        menuLayout.addView(subTitleView);
-
-        int[] options = {2, 4, 6, 8};
-        for (final int count : options) {
+        String[] modes = {"PASS N PLAY (2 Players)", "PASS N PLAY (4 Players)"};
+        final int[] counts = {2, 4};
+        for (int i = 0; i < modes.length; i++) {
+            final int c = counts[i];
             Button btn = new Button(this);
-            btn.setText(count + " Players");
+            btn.setText(modes[i]);
             btn.setTextSize(18);
-            btn.setPadding(20, 20, 20, 20);
-            btn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    playerCount = count;
-                    startLudoGame();
-                }
-            });
-            menuLayout.addView(btn);
+            btn.setTextColor(Color.parseColor("#3E2723"));
+            btn.setBackgroundColor(Color.parseColor("#FFCA28"));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            p.setMargins(0, 30, 0, 0);
+            btn.setLayoutParams(p);
+            btn.setOnClickListener(v -> startGame(c));
+            layout.addView(btn);
         }
-
-        setContentView(menuLayout);
+        setContentView(layout);
     }
 
-    // ----------------------------------------------------
-    // SCREEN 2: GAMEPLAY & RIGGED LOGIC
-    // ----------------------------------------------------
-    private void startLudoGame() {
+    private void startGame(int count) {
         players.clear();
-        int[] colorPalette = {
-            Color.parseColor("#1E88E5"), // 0: Blue (Rigged)
-            Color.parseColor("#E53935"), // 1: Red
-            Color.parseColor("#43A047"), // 2: Green
-            Color.parseColor("#FDD835"), // 3: Yellow
-            Color.parseColor("#8E24AA"), // 4: Purple
-            Color.parseColor("#FB8C00"), // 5: Orange
-            Color.parseColor("#00ACC1"), // 6: Cyan
-            Color.parseColor("#D81B60")  // 7: Pink
-        };
-
-        String[] colorNames = {"Blue", "Red", "Green", "Yellow", "Purple", "Orange", "Cyan", "Pink"};
-
-        for (int i = 0; i < playerCount; i++) {
-            boolean isBlue = (i == 0);
-            int startStep = (i * (trackLength / playerCount));
-            players.add(new Player(colorNames[i], colorPalette[i], isBlue, startStep));
+        // 0: Blue (Rigged), 1: Red, 2: Green, 3: Yellow
+        players.add(new Player("Blue (You)", Color.parseColor("#0080FF"), Color.parseColor("#004080"), true, 0));
+        players.add(new Player("Red", Color.parseColor("#E53935"), Color.parseColor("#8B0000"), false, 26));
+        if (count == 4) {
+            players.add(1, new Player("Green", Color.parseColor("#2E7D32"), Color.parseColor("#144018"), false, 13));
+            players.add(3, new Player("Yellow", Color.parseColor("#FBC02D"), Color.parseColor("#B78103"), false, 39));
         }
 
-        currentPlayerIndex = 0;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#082B66"));
 
-        // Build UI
-        rootLayout = new LinearLayout(this);
-        rootLayout.setOrientation(LinearLayout.VERTICAL);
-        rootLayout.setBackgroundColor(Color.parseColor("#1A1A1A"));
-
-        turnTextView = new TextView(this);
-        turnTextView.setTextSize(20);
-        turnTextView.setPadding(20, 30, 20, 20);
-        turnTextView.setGravity(Gravity.CENTER);
-        updateTurnDisplay();
-        rootLayout.addView(turnTextView);
+        turnText = new TextView(this);
+        turnText.setTextSize(18);
+        turnText.setTypeface(null, Typeface.BOLD);
+        turnText.setPadding(16, 20, 16, 10);
+        turnText.setGravity(Gravity.CENTER);
+        root.addView(turnText);
 
         boardView = new LudoBoardView(this);
-        LinearLayout.LayoutParams boardParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f);
-        rootLayout.addView(boardView, boardParams);
+        root.addView(boardView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
 
-        LinearLayout bottomPanel = new LinearLayout(this);
-        bottomPanel.setOrientation(LinearLayout.VERTICAL);
-        bottomPanel.setPadding(20, 20, 20, 30);
-        bottomPanel.setBackgroundColor(Color.parseColor("#262626"));
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER);
+        bottom.setPadding(20, 16, 20, 24);
+        bottom.setBackgroundColor(Color.parseColor("#051E48"));
 
-        diceButton = new Button(this);
-        diceButton.setText("Roll Dice");
-        diceButton.setTextSize(22);
-        diceButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                rollDice();
-            }
-        });
-        bottomPanel.addView(diceButton);
+        diceView = new DiceView(this);
+        diceView.setOnClickListener(v -> rollDice());
+        bottom.addView(diceView, new LinearLayout.LayoutParams(140, 140));
 
-        tokenControlLayout = new LinearLayout(this);
-        tokenControlLayout.setOrientation(LinearLayout.HORIZONTAL);
-        tokenControlLayout.setGravity(Gravity.CENTER);
-        tokenControlLayout.setPadding(0, 20, 0, 0);
-        bottomPanel.addView(tokenControlLayout);
+        tokenRow = new LinearLayout(this);
+        tokenRow.setOrientation(LinearLayout.HORIZONTAL);
+        tokenRow.setPadding(20, 0, 0, 0);
+        bottom.addView(tokenRow);
 
-        rootLayout.addView(bottomPanel);
-        setContentView(rootLayout);
+        root.addView(bottom);
+        setContentView(root);
+        updateTurn();
     }
 
-    private void updateTurnDisplay() {
-        Player cur = players.get(currentPlayerIndex);
-        turnTextView.setText("Turn: " + cur.name);
-        turnTextView.setTextColor(cur.color);
+    private void updateTurn() {
+        Player p = players.get(curTurn);
+        turnText.setText("Turn: " + p.name);
+        turnText.setTextColor(p.color);
+        diceView.setColor(p.color);
+        tokenRow.removeAllViews();
+        boardView.invalidate();
     }
 
     // ----------------------------------------------------
-    // INCONSPICUOUS RIGGED DICE CALCULATOR
+    // RIGGED DICE LOGIC FOR BLUE
     // ----------------------------------------------------
-    private int computeRollForPlayer(Player player) {
-        if (!player.isRigged) {
-            // Normal Fair RNG
-            return random.nextInt(6) + 1;
-        }
+    private int calculateRoll(Player p) {
+        if (!p.isBlue) return rand.nextInt(6) + 1; // Normal Fair Roll
 
-        // --- BLUE CHEAT 1: Auto-Revive ---
-        boolean hasTokenInBase = false;
-        for (Token t : player.tokens) {
-            if (t.position == -1) {
-                hasTokenInBase = true;
-                if (t.wasJustKilled) {
-                    t.wasJustKilled = false;
-                    return 6; // Guaranteed 6 after being killed
-                }
+        // 1. Auto-Revive on 6 if Blue pawn was killed
+        for (Token t : p.tokens) {
+            if (t.step == -1 && t.wasKilled) {
+                t.wasKilled = false;
+                return 6;
             }
         }
-        if (hasTokenInBase && random.nextInt(100) < 40) {
-            return 6;
-        }
 
-        // --- BLUE CHEAT 2: Auto-Kill (Exact Roll to eliminate nearby enemy) ---
-        for (Token blueToken : player.tokens) {
-            if (blueToken.position >= 0 && blueToken.position < 999) {
-                int blueAbs = (player.startIndex + blueToken.position) % trackLength;
-
+        // 2. Auto-Kill: roll exact distance to capture enemy within 1..6
+        for (Token bt : p.tokens) {
+            if (bt.step >= 0 && bt.step < 51) {
+                int bAbs = (p.startTrackIndex + bt.step) % 52;
                 for (Player enemy : players) {
-                    if (enemy == player) continue;
-                    for (Token enemyToken : enemy.tokens) {
-                        if (enemyToken.position >= 0 && enemyToken.position < 999) {
-                            int enemyAbs = (enemy.startIndex + enemyToken.position) % trackLength;
-                            int distance = (enemyAbs - blueAbs + trackLength) % trackLength;
-
-                            if (distance >= 1 && distance <= 6) {
-                                return distance; // Exact roll to kill enemy!
-                            }
+                    if (enemy == p) continue;
+                    for (Token et : enemy.tokens) {
+                        if (et.step >= 0 && et.step < 51) {
+                            int eAbs = (enemy.startTrackIndex + et.step) % 52;
+                            int dist = (eAbs - bAbs + 52) % 52;
+                            if (dist >= 1 && dist <= 6) return dist; // Guaranteed Kill
                         }
                     }
                 }
             }
         }
-
-        // Fallback: Normal random roll
-        return random.nextInt(6) + 1;
+        return rand.nextInt(6) + 1;
     }
 
     private void rollDice() {
         if (isRolling || canMove) return;
         isRolling = true;
+        Handler h = new Handler();
+        int finalRoll = calculateRoll(players.get(curTurn));
 
-        final Handler handler = new Handler();
-        final int finalValue = computeRollForPlayer(players.get(currentPlayerIndex));
-
-        // Dice roll animation
-        handler.post(new Runnable() {
+        h.post(new Runnable() {
             int ticks = 0;
-            @Override
             public void run() {
                 if (ticks < 6) {
-                    diceValue = random.nextInt(6) + 1;
-                    diceButton.setText("Rolling... " + diceValue);
+                    diceVal = rand.nextInt(6) + 1;
+                    diceView.setVal(diceVal);
                     ticks++;
-                    handler.postDelayed(this, 70);
+                    h.postDelayed(this, 60);
                 } else {
-                    diceValue = finalValue;
-                    diceButton.setText("Rolled: " + diceValue);
+                    diceVal = finalRoll;
+                    diceView.setVal(diceVal);
                     isRolling = false;
                     canMove = true;
-                    buildTokenButtons();
+                    buildTokensUI();
                 }
             }
         });
     }
 
-    private void buildTokenButtons() {
-        tokenControlLayout.removeAllViews();
-        Player cur = players.get(currentPlayerIndex);
-
-        boolean hasAnyValidMove = false;
-        for (final Token token : cur.tokens) {
-            boolean isValid = (token.position == -1 && diceValue == 6) ||
-                              (token.position >= 0 && token.position < 999);
-
-            if (isValid) hasAnyValidMove = true;
-
-            Button btn = new Button(this);
-            String status = token.position == -1 ? "Base" : (token.position == 999 ? "Home" : "P" + token.position);
-            btn.setText("T" + (token.id + 1) + "\n" + status);
-            btn.setEnabled(canMove && isValid);
-            btn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    moveToken(token);
-                }
-            });
-            tokenControlLayout.addView(btn);
+    private void buildTokensUI() {
+        tokenRow.removeAllViews();
+        Player p = players.get(curTurn);
+        boolean hasMove = false;
+        for (Token t : p.tokens) {
+            boolean valid = (t.step == -1 && diceVal == 6) || (t.step >= 0 && t.step + diceVal <= 56);
+            if (valid) hasMove = true;
+            Button b = new Button(this);
+            b.setText("P" + (t.id + 1));
+            b.setEnabled(valid);
+            b.setBackgroundColor(valid ? p.color : Color.DKGRAY);
+            b.setTextColor(Color.WHITE);
+            b.setOnClickListener(v -> move(t));
+            tokenRow.addView(b);
         }
-
-        if (!hasAnyValidMove) {
-            Toast.makeText(this, "No valid moves", Toast.LENGTH_SHORT).show();
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    nextTurn();
-                }
-            }, 800);
+        if (!hasMove) {
+            new Handler().postDelayed(this::nextTurn, 700);
         }
     }
 
-    private void moveToken(Token token) {
+    private void move(Token t) {
         if (!canMove) return;
-        Player cur = players.get(currentPlayerIndex);
-
-        if (token.position == -1 && diceValue == 6) {
-            token.position = 0;
-        } else if (token.position >= 0) {
-            token.position += diceValue;
-            if (token.position >= 56) {
-                token.position = 999; // Reached Home
-            }
-        }
+        Player p = players.get(curTurn);
+        if (t.step == -1 && diceVal == 6) t.step = 0;
+        else if (t.step >= 0) t.step += diceVal;
 
         canMove = false;
-        tokenControlLayout.removeAllViews();
-        checkCaptures(cur, token);
-        boardView.invalidate();
+        tokenRow.removeAllViews();
 
-        if (diceValue == 6) {
-            diceButton.setText("Rolled 6! Roll Again");
+        // Capture check
+        if (t.step >= 0 && t.step < 51) {
+            int myAbs = (p.startTrackIndex + t.step) % 52;
+            for (Player enemy : players) {
+                if (enemy == p) continue;
+                for (Token et : enemy.tokens) {
+                    if (et.step >= 0 && et.step < 51) {
+                        int eAbs = (enemy.startTrackIndex + et.step) % 52;
+                        if (eAbs == myAbs) {
+                            et.step = -1;
+                            et.wasKilled = true;
+                            Toast.makeText(this, p.name + " captured " + enemy.name + "!", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }
+            }
+        }
+        boardView.invalidate();
+        if (diceVal == 6) {
+            Toast.makeText(this, "Rolled 6! Extra Turn", Toast.LENGTH_SHORT).show();
         } else {
             nextTurn();
         }
     }
 
-    private void checkCaptures(Player activePlayer, Token movedToken) {
-        if (movedToken.position < 0 || movedToken.position >= 999) return;
-
-        int activeAbs = (activePlayer.startIndex + movedToken.position) % trackLength;
-
-        for (Player enemy : players) {
-            if (enemy == activePlayer) continue;
-            for (Token enemyToken : enemy.tokens) {
-                if (enemyToken.position >= 0 && enemyToken.position < 999) {
-                    int enemyAbs = (enemy.startIndex + enemyToken.position) % trackLength;
-                    if (enemyAbs == activeAbs) {
-                        enemyToken.position = -1;
-                        enemyToken.wasJustKilled = true;
-                        Toast.makeText(this, activePlayer.name + " killed " + enemy.name + "!", Toast.LENGTH_SHORT).show();
-                    }
-                }
-            }
-        }
-    }
-
     private void nextTurn() {
         canMove = false;
-        currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
-        updateTurnDisplay();
-        diceButton.setText("Roll Dice");
-        tokenControlLayout.removeAllViews();
-        boardView.invalidate();
+        curTurn = (curTurn + 1) % players.size();
+        updateTurn();
     }
 
     // ----------------------------------------------------
-    // LUDO BOARD CUSTOM VIEW
+    // AUTHENTIC LUDO BOARD RENDERER
     // ----------------------------------------------------
-    private class LudoBoardView extends View {
-        private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    class LudoBoardView extends View {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-        public LudoBoardView(Context context) {
-            super(context);
-        }
+        public LudoBoardView(Context c) { super(c); }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            int width = getWidth();
-            int height = getHeight();
-            int boardSize = Math.min(width, height) - 40;
-            int offsetX = (width - boardSize) / 2;
-            int offsetY = (height - boardSize) / 2;
+            int w = getWidth(), h = getHeight();
+            int sz = Math.min(w, h) - 20;
+            int ox = (w - sz) / 2, oy = (h - sz) / 2;
+            float cell = sz / 15f;
 
-            // Draw Board Outline
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setColor(Color.WHITE);
-            paint.setStrokeWidth(4);
-            canvas.drawRect(offsetX, offsetY, offsetX + boardSize, offsetY + boardSize, paint);
+            // Draw Background & 15x15 Grid
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.WHITE);
+            canvas.drawRect(ox, oy, ox + sz, oy + sz, p);
 
-            // Draw Player Bases
-            paint.setStyle(Paint.Style.FILL);
-            int baseSize = (int)(boardSize * 0.35f);
+            // Bases (6x6 cells)
+            drawBase(canvas, ox, oy, cell, 0, 0, Color.parseColor("#2E7D32")); // Green (TL)
+            drawBase(canvas, ox, oy, cell, 9, 0, Color.parseColor("#FBC02D")); // Yellow (TR)
+            drawBase(canvas, ox, oy, cell, 0, 9, Color.parseColor("#E53935")); // Red (BL)
+            drawBase(canvas, ox, oy, cell, 9, 9, Color.parseColor("#0080FF")); // Blue (BR)
 
-            for (int i = 0; i < players.size(); i++) {
-                Player p = players.get(i);
-                paint.setColor(p.color);
-                paint.setAlpha(120);
+            // Home Run Paths
+            for (int i = 1; i <= 5; i++) {
+                fillCell(canvas, ox, oy, cell, i, 7, Color.parseColor("#2E7D32")); // Green
+                fillCell(canvas, ox, oy, cell, 7, i, Color.parseColor("#FBC02D")); // Yellow
+                fillCell(canvas, ox, oy, cell, 7, 14 - i, Color.parseColor("#0080FF")); // Blue
+                fillCell(canvas, ox, oy, cell, 14 - i, 7, Color.parseColor("#E53935")); // Red
+            }
 
-                int bx = offsetX + (i % 2 == 0 ? 10 : boardSize - baseSize - 10);
-                int by = offsetY + (i < 2 ? 10 : boardSize - baseSize - 10);
+            // Grid outlines
+            p.setStyle(Paint.Style.STROKE);
+            p.setColor(Color.parseColor("#BDBDBD"));
+            p.setStrokeWidth(1.5f);
+            for (int i = 0; i <= 15; i++) {
+                canvas.drawLine(ox + i * cell, oy, ox + i * cell, oy + sz, p);
+                canvas.drawLine(ox, oy + i * cell, ox + sz, oy + i * cell, p);
+            }
 
-                canvas.drawRoundRect(new RectF(bx, by, bx + baseSize, by + baseSize), 16, 16, paint);
+            // Center Triangle
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.parseColor("#FFD700"));
+            canvas.drawRect(ox + 6 * cell, oy + 6 * cell, ox + 9 * cell, oy + 9 * cell, p);
 
-                // Draw Tokens inside Base
-                paint.setAlpha(255);
-                for (int t = 0; t < p.tokens.length; t++) {
-                    if (p.tokens[t].position == -1) {
-                        float tx = bx + 40 + (t * 35);
-                        float ty = by + baseSize / 2.0f;
-                        canvas.drawCircle(tx, ty, 14, paint);
+            // Draw Tokens
+            for (Player player : players) {
+                for (Token t : player.tokens) {
+                    float tx = 0, ty = 0;
+                    if (t.step == -1) {
+                        // In Base
+                        int baseCol = (player.startTrackIndex == 0 ? 10 : (player.startTrackIndex == 13 ? 1 : (player.startTrackIndex == 26 ? 1 : 10)));
+                        int baseRow = (player.startTrackIndex == 0 ? 10 : (player.startTrackIndex == 13 ? 1 : (player.startTrackIndex == 26 ? 10 : 1)));
+                        tx = ox + (baseCol + (t.id % 2) * 3 + 1) * cell;
+                        ty = oy + (baseRow + (t.id / 2) * 3 + 1) * cell;
+                    } else if (t.step < 52) {
+                        int pos = (player.startTrackIndex + t.step) % 52;
+                        tx = ox + (TRACK[pos] + 0.5f) * cell;
+                        ty = oy + (TRACK[pos][0] + 0.5f) * cell;
+                    } else {
+                        tx = ox + 7.5f * cell; ty = oy + 7.5f * cell;
                     }
+                    drawPawn(canvas, tx, ty, cell * 0.42f, player.color, player.darkColor);
                 }
             }
+        }
+
+        private void drawBase(Canvas c, int ox, int oy, float cell, int gx, int gy, int col) {
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(col);
+            c.drawRect(ox + gx * cell, oy + gy * cell, ox + (gx + 6) * cell, oy + (gy + 6) * cell, p);
+            p.setColor(Color.WHITE);
+            c.drawRoundRect(new RectF(ox + (gx + 1) * cell, oy + (gy + 1) * cell, ox + (gx + 5) * cell, oy + (gy + 5) * cell), 16, 16, p);
+        }
+
+        private void fillCell(Canvas c, int ox, int oy, float cell, int gx, int gy, int col) {
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(col);
+            c.drawRect(ox + gy * cell, oy + gx * cell, ox + (gy + 1) * cell, oy + (gx + 1) * cell, p);
+        }
+
+        private void drawPawn(Canvas c, float x, float y, float r, int col, int dark) {
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.WHITE);
+            c.drawCircle(x, y, r + 4, p);
+            p.setColor(col);
+            c.drawCircle(x, y, r, p);
+            p.setColor(dark);
+            c.drawCircle(x, y, r * 0.4f, p);
+        }
+    }
+
+    // ----------------------------------------------------
+    // DICE VIEW WITH DOTS
+    // ----------------------------------------------------
+    class DiceView extends View {
+        private int val = 6, color = Color.RED;
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        public DiceView(Context c) { super(c); }
+        public void setVal(int v) { this.val = v; invalidate(); }
+        public void setColor(int c) { this.color = c; invalidate(); }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            int sz = Math.min(getWidth(), getHeight()) - 10;
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.WHITE);
+            canvas.drawRoundRect(new RectF(5, 5, sz, sz), 18, 18, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(6);
+            p.setColor(color);
+            canvas.drawRoundRect(new RectF(5, 5, sz, sz), 18, 18, p);
+
+            // Draw Dots
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(color);
+            float mid = sz / 2f + 5, l = sz * 0.28f + 5, r = sz * 0.72f + 5;
+            float rad = sz * 0.08f;
+            if (val % 2 == 1) canvas.drawCircle(mid, mid, rad, p); // 1, 3, 5
+            if (val >= 2) { canvas.drawCircle(l, l, rad, p); canvas.drawCircle(r, r, rad, p); }
+            if (val >= 4) { canvas.drawCircle(r, l, rad, p); canvas.drawCircle(l, r, rad, p); }
+            if (val == 6) { canvas.drawCircle(l, mid, rad, p); canvas.drawCircle(r, mid, rad, p); }
         }
     }
 }

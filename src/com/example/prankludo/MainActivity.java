@@ -92,7 +92,6 @@ public class MainActivity extends Activity {
 
     private void startGame(int count) {
         players.clear();
-        // 0: Blue (Rigged), 1: Red, 2: Green, 3: Yellow
         players.add(new Player("Blue (You)", Color.parseColor("#0080FF"), Color.parseColor("#004080"), true, 0));
         players.add(new Player("Red", Color.parseColor("#E53935"), Color.parseColor("#8B0000"), false, 26));
         if (count == 4) {
@@ -152,7 +151,7 @@ public class MainActivity extends Activity {
     // RIGGED DICE LOGIC FOR BLUE
     // ----------------------------------------------------
     private int calculateRoll(Player p) {
-        if (!p.isBlue) return rand.nextInt(6) + 1; // Normal Fair Roll
+        if (!p.isBlue) return rand.nextInt(6) + 1;
 
         // 1. Auto-Revive on 6 if Blue pawn was killed
         for (Token t : p.tokens) {
@@ -172,7 +171,7 @@ public class MainActivity extends Activity {
                         if (et.step >= 0 && et.step < 51) {
                             int eAbs = (enemy.startTrackIndex + et.step) % 52;
                             int dist = (eAbs - bAbs + 52) % 52;
-                            if (dist >= 1 && dist <= 6) return dist; // Guaranteed Kill
+                            if (dist >= 1 && dist <= 6) return dist;
                         }
                     }
                 }
@@ -246,7 +245,6 @@ public class MainActivity extends Activity {
         canMove = false;
         tokenRow.removeAllViews();
 
-        // Capture check
         if (t.step >= 0 && t.step < 51) {
             int myAbs = (p.startTrackIndex + t.step) % 52;
             for (Player enemy : players) {
@@ -306,10 +304,10 @@ public class MainActivity extends Activity {
 
             // Home Run Paths
             for (int i = 1; i <= 5; i++) {
-                fillCell(canvas, ox, oy, cell, i, 7, Color.parseColor("#2E7D32")); // Green
-                fillCell(canvas, ox, oy, cell, 7, i, Color.parseColor("#FBC02D")); // Yellow
-                fillCell(canvas, ox, oy, cell, 7, 14 - i, Color.parseColor("#0080FF")); // Blue
-                fillCell(canvas, ox, oy, cell, 14 - i, 7, Color.parseColor("#E53935")); // Red
+                fillCell(canvas, ox, oy, cell, i, 7, Color.parseColor("#2E7D32"));
+                fillCell(canvas, ox, oy, cell, 7, i, Color.parseColor("#FBC02D"));
+                fillCell(canvas, ox, oy, cell, 7, 14 - i, Color.parseColor("#0080FF"));
+                fillCell(canvas, ox, oy, cell, 14 - i, 7, Color.parseColor("#E53935"));
             }
 
             // Grid outlines
@@ -331,15 +329,16 @@ public class MainActivity extends Activity {
                 for (Token t : player.tokens) {
                     float tx = 0, ty = 0;
                     if (t.step == -1) {
-                        // In Base
                         int baseCol = (player.startTrackIndex == 0 ? 10 : (player.startTrackIndex == 13 ? 1 : (player.startTrackIndex == 26 ? 1 : 10)));
                         int baseRow = (player.startTrackIndex == 0 ? 10 : (player.startTrackIndex == 13 ? 1 : (player.startTrackIndex == 26 ? 10 : 1)));
                         tx = ox + (baseCol + (t.id % 2) * 3 + 1.5f) * cell;
                         ty = oy + (baseRow + (t.id / 2) * 3 + 1.5f) * cell;
                     } else if (t.step < 52) {
                         int pos = (player.startTrackIndex + t.step) % 52;
-                        tx = ox + (TRACK[pos] + 0.5f) * cell;
-                        ty = oy + (TRACK[pos][0] + 0.5f) * cell;
+                        int trackRow = TRACK[pos][0];
+                        int trackCol = TRACK[pos];
+                        tx = ox + (trackCol + 0.5f) * cell;
+                        ty = oy + (trackRow + 0.5f) * cell;
                     } else {
                         tx = ox + 7.5f * cell; ty = oy + 7.5f * cell;
                     }
